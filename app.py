@@ -45,16 +45,17 @@ app.config.update(
 # Start elasticsearch server
 elastic = ElasticSearchEngine()
 
+# If running in local, prepare data and upload to elasticsearch
 if os.getenv("ENV") == "local":
     elastic.run()
 
 @app.route("/", methods = ["GET", "POST"])
 @cross_origin(origins="*")
 def dashboard():
-    result = elastic.es.search(index="posts", query={
-        "match_all": {}
-    }, size=os.getenv("QUERY_MAX_ROWS"))
+    # Get all posts
+    result = elastic.es.search(index="posts", query={ "match_all": {} }, size=os.getenv("QUERY_MAX_ROWS"))
 
+    # Get all tags
     tags = list({post["_source"]["tag"] for post in result["hits"]["hits"]})
     tags.sort(key=locale.strxfrm)
     tags.insert(0, "ALL")
@@ -67,12 +68,6 @@ def dashboard():
         search = request.form.get("search")
 
         if search:
-            result = elastic.es.search(index="posts", query={
-                "match": {
-                    "title": search
-                }
-            }, size=os.getenv("QUERY_MAX_ROWS"))
-
             query_vector = embed_text_query([tokenize(search)])[0]
             result = elastic.es.search(index="posts", query={
                 "script_score": {
@@ -80,16 +75,17 @@ def dashboard():
                         "match_all": {}
                     },
                     "script": {
+                        # Add 1.0 to avoid negative score
                         "source": "cosineSimilarity(params.query_vector, 'title_vector') + 1.0",
                         "params": {"query_vector": query_vector}
                     }
                 }
-            }, size=os.getenv("QUERY_MAX_ROWS"))
+            }, size=os.getenv("QUERY_MAX_ROWS"), min_score=float(os.getenv("SEARCH_THRESHOLD")) + 1.0)
 
         if tag != "ALL":
             # Delete all posts that don't match the tag from the result list
             # in reverse order to avoid index out of range error
-            for i in range(len(result["hits"]["hits"]) - 1, -1, -1):
+            for i in reversed(range(len(result["hits"]["hits"]))):
                 if result["hits"]["hits"][i]["_source"]["tag"] != tag:
                     del result["hits"]["hits"][i]
 

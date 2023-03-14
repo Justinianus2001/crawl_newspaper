@@ -28,6 +28,10 @@ form {
     color: inherit;
 }
 
+.icon {
+    width: 30px;
+}
+
 .left {
     display: block;
     text-align: left;

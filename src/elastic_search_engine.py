@@ -38,12 +38,6 @@ class ElasticSearchEngine:
                 "enabled": "true"
             },
             "properties": {
-                "id": {
-                    "type": "text"
-                },
-                "title": {
-                    "type": "text"
-                },
                 "title_vector": {
                     "type": "dense_vector",
                     "dims": 768
@@ -62,6 +56,7 @@ class ElasticSearchEngine:
         lst.dropna(axis=0, inplace=True)
         lst = lst.values
 
+        # Batch indexing
         for i in range(0, len(lst), int(os.getenv("BATCH_SIZE"))):
             docs = lst[i:i+int(os.getenv("BATCH_SIZE"))]
 
